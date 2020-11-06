@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -18,7 +19,8 @@ namespace VirtoCommerce.ChangesCollectorModule.Data
     {
         private readonly Dictionary<Type, List<Func<IMessage, CancellationToken, Task>>> _routes = new Dictionary<Type, List<Func<IMessage, CancellationToken, Task>>>();
 
-        private readonly Dictionary<Type, string> _moduleNameByTypeCache = new Dictionary<Type, string>();
+        private readonly Dictionary<Type, MethodInfo> _gettersCacheChangedEntries = new Dictionary<Type, MethodInfo>();
+        private readonly Dictionary<Type, MethodInfo> _gettersCacheNewEntry = new Dictionary<Type, MethodInfo>();
 
         public IPlatformMemoryCache PlatformCache { get; set; }
         public IModuleCatalog ModuleCatalog { get; set; }
@@ -35,8 +37,12 @@ namespace VirtoCommerce.ChangesCollectorModule.Data
 
         public async Task Publish<T>(T @event, CancellationToken cancellationToken = default(CancellationToken)) where T : class, IEvent
         {
-            var module = GetModuleByType(@event.GetType());
-            ChangesCollectorCacheRegion.ExpireTokenForKey(module);
+            var modelTypeNames = GetModelsNamesByEventType(@event);
+
+            foreach (var modelTypeName in modelTypeNames)
+            {
+                ChangesCollectorCacheRegion.ExpireTokenForKey(modelTypeName);
+            }
 
             if (!EventSuppressor.EventsSuppressed && _routes.TryGetValue(@event.GetType(), out var handlers))
             {
@@ -44,19 +50,51 @@ namespace VirtoCommerce.ChangesCollectorModule.Data
             }
         }
 
-        public DateTimeOffset GetLastModified(string module)
+        public DateTimeOffset GetLastModified(string modelTypeName)
         {
-            var cacheKey = CacheKey.With(GetType(), "LastModifiedDateTime", module);
+            var cacheKey = CacheKey.With(GetType(), "LastModifiedDateTime", modelTypeName);
             return PlatformCache.GetOrCreateExclusive(cacheKey, (cacheEntry) =>
             {
-                cacheEntry.AddExpirationToken(ChangesCollectorCacheRegion.CreateChangeTokenForKey(module));
+                cacheEntry.AddExpirationToken(ChangesCollectorCacheRegion.CreateChangeTokenForKey(modelTypeName));
                 return DateTimeOffset.Now;
             });
         }
 
-        private string GetModuleByType(Type type)
+
+        private List<string> GetModelsNamesByEventType<T>(T @event) where T : class, IEvent
         {
-            if (!_moduleNameByTypeCache.ContainsKey(type))
+            var result = new List<string>();
+
+            if (@event.GetType().BaseType.IsSubclassOf(typeof(DomainEvent))) // Is it GenericChangedEntryEvent ?
+            {
+                var eventType = @event.GetType();
+                if (!_gettersCacheChangedEntries.ContainsKey(eventType)) // Just remember getter to eliminate reflection slowness
+                {
+                    _gettersCacheChangedEntries.Add(eventType, eventType.GetProperty("ChangedEntries").GetGetMethod());
+                }
+
+                var changedEntries = (IEnumerable)_gettersCacheChangedEntries[eventType].Invoke(@event, null);
+
+                foreach (var changedEntry in changedEntries)
+                {
+                    var changedEntryType = changedEntry.GetType();
+                    if (!_gettersCacheNewEntry.ContainsKey(changedEntryType)) // Just remember getter to eliminate reflection slowness
+                    {
+                        _gettersCacheNewEntry.Add(changedEntryType, changedEntryType.GetProperty("NewEntry").GetGetMethod());
+                    }
+                    var changedEntryTypeName = _gettersCacheNewEntry[changedEntryType].Invoke(changedEntry, null).GetType().FullName;
+                    result.Add(changedEntryTypeName);
+                }
+
+            }
+
+            return result;
+        }
+
+        /*
+        private string GetModuleNameByEventType(Type eventType)
+        {
+            if (!_moduleNameByTypeCache.ContainsKey(eventType))
             {
 
                 var module = ModuleCatalog?.Modules.Where(module =>
@@ -64,16 +102,17 @@ namespace VirtoCommerce.ChangesCollectorModule.Data
                         return module.Assembly.GetReferencedAssemblies()
                             .Select(assemlyName => Assembly.Load(assemlyName))
                             .SelectMany(assembly => assembly.GetTypes())
-                            .Contains(type);
+                            .Contains(eventType);
                     }
-                    ).FirstOrDefault(moduleInfo => type.Assembly.GetName().Name.Contains(moduleInfo.Assembly.GetName().Name.Replace(".Web", "")));
+                    ).FirstOrDefault(moduleInfo => eventType.Assembly.GetName().Name.Contains(moduleInfo.Assembly.GetName().Name.Replace(".Web", "")));
 
                 if (module is null) return "Platform"; //No module found, seems it is the platform
 
-                _moduleNameByTypeCache.Add(type, module.ModuleName);
+                _moduleNameByTypeCache.Add(eventType, module.ModuleName);
             }
-            return _moduleNameByTypeCache[type];
+            return _moduleNameByTypeCache[eventType];
         }
+        */
     }
 
 }

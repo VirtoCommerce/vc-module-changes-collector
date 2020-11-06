@@ -4,6 +4,6 @@ namespace VirtoCommerce.ChangesCollectorModule.Core
 {
     public interface ILastChangesService
     {
-        public DateTimeOffset GetLastModified(string module);
+        public DateTimeOffset GetLastModified(string modelTypeName);
     }
 }

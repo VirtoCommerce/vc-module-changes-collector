@@ -18,12 +18,12 @@ namespace VirtoCommerce.ChangesCollectorModule.Web.Controllers.Api
         [HttpGet]
         [Route("~/api/changescollector/lastmodifieddate")]
         [AllowAnonymous]
-        public ActionResult<LastModifiedResponse> GetLastModifiedDate([FromQuery] string module = null)
+        public ActionResult<LastModifiedResponse> GetLastModifiedDate([FromQuery] string modelTypeName = null)
         {
             var result = new LastModifiedResponse
             {
-                Scope = module,
-                LastModifiedDate = _lastChangesService.GetLastModified(module).UtcDateTime
+                Scope = modelTypeName,
+                LastModifiedDate = _lastChangesService.GetLastModified(modelTypeName).UtcDateTime
             };
 
             return Ok(result);
