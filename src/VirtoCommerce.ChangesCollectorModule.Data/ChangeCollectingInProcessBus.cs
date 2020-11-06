@@ -56,7 +56,7 @@ namespace VirtoCommerce.ChangesCollectorModule.Data
             return PlatformCache.GetOrCreateExclusive(cacheKey, (cacheEntry) =>
             {
                 cacheEntry.AddExpirationToken(ChangesCollectorCacheRegion.CreateChangeTokenForKey(modelTypeName));
-                return DateTimeOffset.Now;
+                return DateTimeOffset.UtcNow;
             });
         }
 
