@@ -20,7 +20,20 @@ namespace VirtoCommerce.ChangesCollectorModule.Data
         {
             _platformMemoryCache = platformMemoryCache;
 
-            var scopesJson = settingsManager.GetValue(ModuleConstants.Settings.General.Scopes.Name, "");
+            string scopesJson;
+            var scopesFilePath = Path.GetFullPath("changes-collector-scopes.json");
+            if (File.Exists(scopesFilePath))
+            {
+                using (var scopesStream = File.OpenRead(scopesFilePath))
+                {
+                    scopesJson = scopesStream.ReadToString();
+                }
+            }
+            else
+            {
+                scopesJson = settingsManager.GetValue(ModuleConstants.Settings.General.Scopes.Name, "");
+            }
+
             var stream = new MemoryStream(Encoding.UTF8.GetBytes(scopesJson));
             _scopes = stream.DeserializeJson<Dictionary<string, List<string>>>();
             _scopes ??= new Dictionary<string, List<string>>();
