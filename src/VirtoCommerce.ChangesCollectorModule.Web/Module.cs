@@ -1,12 +1,10 @@
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using VirtoCommerce.ChangesCollectorModule.Core;
 using VirtoCommerce.ChangesCollectorModule.Data;
-using VirtoCommerce.Platform.Core.Bus;
-using VirtoCommerce.Platform.Core.Caching;
-using VirtoCommerce.Platform.Core.Events;
 using VirtoCommerce.Platform.Core.Modularity;
+using VirtoCommerce.Platform.Core.Settings;
 
 namespace VirtoCommerce.ChangesCollectorModule.Web
 {
@@ -16,22 +14,16 @@ namespace VirtoCommerce.ChangesCollectorModule.Web
 
         public void Initialize(IServiceCollection serviceCollection)
         {
-            serviceCollection.RemoveAll<IHandlerRegistrar>();
-            serviceCollection.RemoveAll<IEventPublisher>();
-
-            var collectingInProcessBus = new ChangeCollectingInProcessBus();
-            serviceCollection.AddSingleton<IHandlerRegistrar>(collectingInProcessBus);
-            serviceCollection.AddSingleton<IEventPublisher>(collectingInProcessBus);
-            serviceCollection.AddSingleton<ILastChangesService>(collectingInProcessBus);
+            serviceCollection.AddSingleton<ILastChangesService, LastChangesService>();
         }
 
         public void PostInitialize(IApplicationBuilder appBuilder)
         {
-            var collectingInProcessBus = appBuilder.ApplicationServices.GetService<IHandlerRegistrar>();
-            var platformMemoryCache = appBuilder.ApplicationServices.GetService<IPlatformMemoryCache>();
-            var moduleCatalog = appBuilder.ApplicationServices.GetService<IModuleCatalog>();
-            ((ChangeCollectingInProcessBus)collectingInProcessBus).PlatformCache = platformMemoryCache;
-            ((ChangeCollectingInProcessBus)collectingInProcessBus).ModuleCatalog = moduleCatalog;
+            // register settings
+            var settingsRegistrar = appBuilder.ApplicationServices.GetRequiredService<ISettingsRegistrar>();
+            settingsRegistrar.RegisterSettings(ModuleConstants.Settings.General.AllSettings, ModuleInfo.Id);
+
+            appBuilder.UseDbTriggers();
         }
 
         public void Uninstall()

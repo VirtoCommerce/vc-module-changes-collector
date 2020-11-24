@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VirtoCommerce.ChangesCollectorModule.Core;
@@ -29,5 +30,24 @@ namespace VirtoCommerce.ChangesCollectorModule.Web.Controllers.Api
             return Ok(result);
         }
 
+        [HttpGet]
+        [Route("~/api/changescollector/lastmodifieddateallscopes")]
+        [AllowAnonymous]
+        public ActionResult<LastModifiedResponse[]> GetLastModifiedDateForAllScopes()
+        {
+            var allScopes = _lastChangesService.GetAllScopes();
+            var result = new List<LastModifiedResponse>();
+
+            foreach (var scope in allScopes)
+            {
+                result.Add(new LastModifiedResponse
+                {
+                    Scope = scope,
+                    LastModifiedDate = _lastChangesService.GetLastModified(scope).UtcDateTime
+                });
+            }
+
+            return Ok(result.ToArray());
+        }
     }
 }

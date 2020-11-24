@@ -1,0 +1,11 @@
+{
+  "settings": {
+    "VirtoCommerce.ChangesCollectorModule":
+    {
+      "Scopes": {
+        "title": "Scopes",
+        "description": "Specify scopes-definition JSON (restart required)"
+      }
+    }
+  }
+}
