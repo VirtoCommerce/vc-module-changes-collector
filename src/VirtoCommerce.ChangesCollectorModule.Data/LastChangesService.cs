@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
 using VirtoCommerce.ChangesCollectorModule.Core;
 using VirtoCommerce.Platform.Core.Caching;
 using VirtoCommerce.Platform.Core.Common;
