@@ -1,11 +1,13 @@
 {
   "settings": {
-    "VirtoCommerce.ChangesCollectorModule":
-    {
+    "VirtoCommerce.ChangesCollectorModule": {
       "Scopes": {
         "title": "Scopes",
         "description": "Specify scopes-definition JSON (restart required)"
       }
     }
+  },
+  "permissions": {
+    "changes-collector:scopes:reset": "Reset scope modification dates"
   }
 }

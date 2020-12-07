@@ -1,70 +1,89 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using Microsoft.Extensions.Caching.Memory;
 using VirtoCommerce.ChangesCollectorModule.Core;
 using VirtoCommerce.Platform.Core.Caching;
 using VirtoCommerce.Platform.Core.Common;
-using VirtoCommerce.Platform.Core.Settings;
 
 namespace VirtoCommerce.ChangesCollectorModule.Data
 {
     public class LastChangesService : ILastChangesService
     {
         private readonly IPlatformMemoryCache _platformMemoryCache;
-        private readonly Dictionary<string, List<string>> _scopes;
+        private IDictionary<string, IList<string>> _scopes = new Dictionary<string, IList<string>>();
 
-        public LastChangesService(IPlatformMemoryCache platformMemoryCache, ISettingsManager settingsManager)
+        public LastChangesService(IPlatformMemoryCache platformMemoryCache)
         {
             _platformMemoryCache = platformMemoryCache;
-
-            string scopesJson;
-            var scopesFilePath = Path.GetFullPath("changes-collector-scopes.json");
-            if (File.Exists(scopesFilePath))
-            {
-                using (var scopesStream = File.OpenRead(scopesFilePath))
-                {
-                    scopesJson = scopesStream.ReadToString();
-                }
-            }
-            else
-            {
-                scopesJson = settingsManager.GetValue(ModuleConstants.Settings.General.Scopes.Name, "");
-            }
-
-            var stream = new MemoryStream(Encoding.UTF8.GetBytes(scopesJson));
-            _scopes = stream.DeserializeJson<Dictionary<string, List<string>>>();
-            _scopes ??= new Dictionary<string, List<string>>();
         }
 
-        public IEnumerable<string> GetAllScopes()
+        public virtual void LoadScopes(IDictionary<string, IList<string>> scopes)
+        {
+            if (scopes?.Any() == true)
+            {
+                _scopes = scopes;
+            }
+        }
+
+        public virtual IEnumerable<string> GetAllScopes()
         {
             return _scopes.Keys;
         }
 
         public virtual DateTimeOffset GetLastModified(string scopeName)
         {
-            if (!scopeName.IsNullOrEmpty())
+            DateTimeOffset result;
+
+            if (!scopeName.IsNullOrEmpty() && _scopes.ContainsKey(scopeName))
             {
                 var cacheKey = CacheKey.With(GetType(), "LastModifiedDateTime", scopeName);
-                return _platformMemoryCache.GetOrCreateExclusive(cacheKey, (cacheEntry) =>
+                result = _platformMemoryCache.GetOrCreateExclusive(cacheKey, options =>
                 {
-                    cacheEntry.AddExpirationToken(ChangesCollectorCacheRegion.CreateChangeTokenForKey(scopeName));
+                    options.AddExpirationToken(ChangesCollectorCacheRegion.CreateChangeTokenForKey(scopeName));
+
                     return DateTimeOffset.UtcNow;
                 });
             }
             else
             {
-                return DateTimeOffset.MinValue;
+                // If the requested scope is not known to this module, do not use cached date - otherwise, it will never change, and data from that scope will get stuck in cache.
+                // Instead, return the current date, as if target data had been modified just now.
+                result = DateTimeOffset.UtcNow;
             }
+
+            return result;
         }
 
         public virtual void SetLastModified(IEntity entry)
         {
-            var scopeName = _scopes.FirstOrDefault(x => x.Value.Contains(entry.GetType().FullName)).Key;
+            var scopeNames = _scopes
+                .Where(x => x.Value.Contains(entry.GetType().FullName))
+                .Select(x => x.Key)
+                .ToList();
+
+            ExpireLastModifiedDateForScopes(scopeNames);
+        }
+
+        public virtual void ResetScope(string scopeName)
+        {
             if (!scopeName.IsNullOrEmpty())
+            {
+                ExpireLastModifiedDateForScopes(new[] { scopeName });
+            }
+        }
+
+        public virtual void ResetAllScopes()
+        {
+            var scopeNames = GetAllScopes();
+
+            ExpireLastModifiedDateForScopes(scopeNames);
+        }
+
+
+        protected virtual void ExpireLastModifiedDateForScopes(IEnumerable<string> scopeNames)
+        {
+            foreach (var scopeName in scopeNames)
             {
                 ChangesCollectorCacheRegion.ExpireTokenForKey(scopeName);
             }

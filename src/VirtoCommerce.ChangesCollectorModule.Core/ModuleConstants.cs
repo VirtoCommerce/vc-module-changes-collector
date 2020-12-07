@@ -25,5 +25,24 @@ namespace VirtoCommerce.ChangesCollectorModule.Core
                 }
             }
         }
+
+        public static class Security
+        {
+            public static class Permissions
+            {
+                public static class Scopes
+                {
+                    public const string Reset = "changes-collector:scopes:reset";
+                }
+
+                public static IEnumerable<string> AllPermissions
+                {
+                    get
+                    {
+                        yield return Scopes.Reset;
+                    }
+                }
+            }
+        }
     }
 }

@@ -6,8 +6,11 @@ namespace VirtoCommerce.ChangesCollectorModule.Core
 {
     public interface ILastChangesService
     {
-        public DateTimeOffset GetLastModified(string scopeName);
+        public void LoadScopes(IDictionary<string, IList<string>> scopes);
         public IEnumerable<string> GetAllScopes();
+        public DateTimeOffset GetLastModified(string scopeName);
         public void SetLastModified(IEntity entry);
+        public void ResetScope(string scopeName);
+        public void ResetAllScopes();
     }
 }

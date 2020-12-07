@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using VirtoCommerce.ChangesCollectorModule.Core;
 using VirtoCommerce.ChangesCollectorModule.Web.Model;
@@ -7,6 +8,7 @@ using VirtoCommerce.ChangesCollectorModule.Web.Model;
 namespace VirtoCommerce.ChangesCollectorModule.Web.Controllers.Api
 {
     [Authorize]
+    [Route("api/last-modified-dates")]
     public class ChangesCollectorController : Controller
     {
         private readonly ILastChangesService _lastChangesService;
@@ -17,9 +19,9 @@ namespace VirtoCommerce.ChangesCollectorModule.Web.Controllers.Api
         }
 
         [HttpGet]
-        [Route("~/api/changes-collector/last-modified-date")]
+        [Route("{scope}")]
         [AllowAnonymous]
-        public ActionResult<LastModifiedResponse> GetLastModifiedDate([FromQuery] string scope = null)
+        public ActionResult<LastModifiedResponse> GetLastModifiedDate([FromRoute] string scope = null)
         {
             var result = new LastModifiedResponse
             {
@@ -31,9 +33,9 @@ namespace VirtoCommerce.ChangesCollectorModule.Web.Controllers.Api
         }
 
         [HttpGet]
-        [Route("~/api/changes-collector/last-modified-date-all-scopes")]
+        [Route("")]
         [AllowAnonymous]
-        public ActionResult<LastModifiedResponse[]> GetLastModifiedDateForAllScopes()
+        public ActionResult<IList<LastModifiedResponse>> GetLastModifiedDateForAllScopes()
         {
             var allScopes = _lastChangesService.GetAllScopes();
             var result = new List<LastModifiedResponse>();
@@ -47,7 +49,29 @@ namespace VirtoCommerce.ChangesCollectorModule.Web.Controllers.Api
                 });
             }
 
-            return Ok(result.ToArray());
+            return Ok(result);
+        }
+
+        [HttpPost]
+        [Route("{scope}/reset")]
+        [Authorize(ModuleConstants.Security.Permissions.Scopes.Reset)]
+        [ProducesResponseType(typeof(void), StatusCodes.Status204NoContent)]
+        public ActionResult ResetLastModifiedDate([FromRoute] string scope)
+        {
+            _lastChangesService.ResetScope(scope);
+
+            return NoContent();
+        }
+
+        [HttpPost]
+        [Route("reset")]
+        [Authorize(ModuleConstants.Security.Permissions.Scopes.Reset)]
+        [ProducesResponseType(typeof(void), StatusCodes.Status204NoContent)]
+        public ActionResult ResetLastModifiedDates()
+        {
+            _lastChangesService.ResetAllScopes();
+
+            return NoContent();
         }
     }
 }
